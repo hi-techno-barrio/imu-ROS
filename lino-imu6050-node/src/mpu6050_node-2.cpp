@@ -32,9 +32,9 @@ int main(int argc, char **argv) {
   wiringPiI2CWriteReg16(fd, PWR_MGMT_1, 0);
 
   // Start ROS node stuff.
-  ros::init(argc, argv, "mpu6050");
+  ros::init(argc, argv, "imu6050");
   ros::NodeHandle node;
-  ros::Publisher pub = node.advertise<sensor_msgs::Imu>("imu", 10);
+ // ros::Publisher pub = node.advertise<sensor_msgs::Imu>("imu", 10);
   lino_msgs::Imu raw_imu_msg;
   ros::Publisher raw_imu_pub("raw_imu", &raw_imu_msg);
   // nh.advertise(raw_imu_pub);
@@ -42,27 +42,7 @@ int main(int argc, char **argv) {
 
   // Publish in loop.
   while(ros::ok()) {
-    lino_msgs::Imu raw_imu_msg;
-    //sensor_msgs::Imu msg;
-    msg.header.stamp = ros::Time::now();
-    msg.header.frame_id = '0';  // no frame
 
-    // Read gyroscope values.
-    // At default sensitivity of 250deg/s we need to scale by 131.
-    msg.angular_velocity.x = read_word_2c(fd, 0x43) / 131;
-    msg.angular_velocity.y = read_word_2c(fd, 0x45) / 131;
-    msg.angular_velocity.z = read_word_2c(fd, 0x47) / 131;
-
-    // Read accelerometer values.
-    // At default sensitivity of 2g we need to scale by 16384.
-    // Note: at "level" x = y = 0 but z = 1 (i.e. gravity)
-    // But! Imu msg docs say acceleration should be in m/2 so need to *9.807
-    const float la_rescale = 16384.0 / 9.807;
-    msg.linear_acceleration.x = read_word_2c(fd, 0x3b) / la_rescale;
-    msg.linear_acceleration.y = read_word_2c(fd, 0x3d) / la_rescale;
-    msg.linear_acceleration.z = read_word_2c(fd, 0x3f) / la_rescale;
-
-    
 //this block publishes the IMU data based on defined rate
     if ((millis() - prev_imu_time) >= (1000 / IMU_PUBLISH_RATE))
     {
@@ -82,9 +62,6 @@ int main(int argc, char **argv) {
         }
         prev_imu_time = millis();
     }
-    
-    
-    
     // Pub & sleep.
     pub.publish(msg);
     ros::spinOnce();
@@ -95,14 +72,26 @@ int main(int argc, char **argv) {
 
 void publishIMU()
 {
-    //pass accelerometer data to imu object
-    raw_imu_msg.linear_acceleration = readAccelerometer();
+    // pass accelerometer data to imu object
+    // raw_imu_msg.linear_acceleration = readAccelerometer(); // Read gyroscope values.
+    // At default sensitivity of 250deg/s we need to scale by 131.
+    raw_imu_msg.angular_velocity.x = read_word_2c(fd, 0x43) / 131;
+    raw_imu_msg.angular_velocity.y = read_word_2c(fd, 0x45) / 131;
+    raw_imu_msg.angular_velocity.z = read_word_2c(fd, 0x47) / 131;
 
-    //pass gyroscope data to imu object
-    raw_imu_msg.angular_velocity = readGyroscope();
+    // pass gyroscope data to imu object
+    // raw_imu_msg.angular_velocity = readGyroscope();
+    // Read accelerometer values.
+    // At default sensitivity of 2g we need to scale by 16384.
+    // Note: at "level" x = y = 0 but z = 1 (i.e. gravity)
+    // But! Imu msg docs say acceleration should be in m/2 so need to *9.807
+    const float la_rescale = 16384.0 / 9.807;
+    raw_imu_msg.linear_acceleration.x = read_word_2c(fd, 0x3b) / la_rescale;
+    raw_imu_msg.linear_acceleration.y = read_word_2c(fd, 0x3d) / la_rescale;
+    raw_imu_msg.linear_acceleration.z = read_word_2c(fd, 0x3f) / la_rescale;
 
-    //pass accelerometer data to imu object
-    raw_imu_msg.magnetic_field = readMagnetometer();
+    //pass accelerometer data to imu object  must be zero!
+    //raw_imu_msg.magnetic_field = readMagnetometer();
 
     //publish raw_imu_msg
     raw_imu_pub.publish(&raw_imu_msg);
