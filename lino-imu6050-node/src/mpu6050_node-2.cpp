@@ -1,7 +1,11 @@
-#include <ros/ros.h>
+
+
 #include <sensor_msgs/Imu.h>
 #include <wiringPi.h>
 #include <wiringPiI2C.h>
+//header file for imu
+#include "lino_msgs/Imu.h"
+#include <ros/ros.h>
 
 using namespace std;
 
@@ -14,6 +18,7 @@ float read_word_2c(int fd, int addr) {
   int val = (high << 8) + low;
   return float((val >= 0x8000) ? -((65535 - val) + 1) : val);
 }
+
 
 int main(int argc, char **argv) {
 
@@ -30,11 +35,15 @@ int main(int argc, char **argv) {
   ros::init(argc, argv, "mpu6050");
   ros::NodeHandle node;
   ros::Publisher pub = node.advertise<sensor_msgs::Imu>("imu", 10);
+  lino_msgs::Imu raw_imu_msg;
+  ros::Publisher raw_imu_pub("raw_imu", &raw_imu_msg);
+  // nh.advertise(raw_imu_pub);
   ros::Rate rate(10);  // hz
 
   // Publish in loop.
   while(ros::ok()) {
-    sensor_msgs::Imu msg;
+    lino_msgs::Imu raw_imu_msg;
+    //sensor_msgs::Imu msg;
     msg.header.stamp = ros::Time::now();
     msg.header.frame_id = '0';  // no frame
 
@@ -53,6 +62,29 @@ int main(int argc, char **argv) {
     msg.linear_acceleration.y = read_word_2c(fd, 0x3d) / la_rescale;
     msg.linear_acceleration.z = read_word_2c(fd, 0x3f) / la_rescale;
 
+    
+//this block publishes the IMU data based on defined rate
+    if ((millis() - prev_imu_time) >= (1000 / IMU_PUBLISH_RATE))
+    {
+        //sanity check if the IMU is connected
+        if (!imu_is_initialized)
+        {
+            imu_is_initialized = initIMU();
+
+            if(imu_is_initialized)
+                nh.loginfo("IMU Initialized");
+            else
+                nh.logfatal("IMU failed to initialize. Check your IMU connection.");
+        }
+        else
+        {
+            publishIMU();
+        }
+        prev_imu_time = millis();
+    }
+    
+    
+    
     // Pub & sleep.
     pub.publish(msg);
     ros::spinOnce();
@@ -60,4 +92,20 @@ int main(int argc, char **argv) {
   }
   return 0;
 }
+
+void publishIMU()
+{
+    //pass accelerometer data to imu object
+    raw_imu_msg.linear_acceleration = readAccelerometer();
+
+    //pass gyroscope data to imu object
+    raw_imu_msg.angular_velocity = readGyroscope();
+
+    //pass accelerometer data to imu object
+    raw_imu_msg.magnetic_field = readMagnetometer();
+
+    //publish raw_imu_msg
+    raw_imu_pub.publish(&raw_imu_msg);
+}
+
 
