@@ -43,7 +43,13 @@ int main(int argc, char **argv) {
   // Publish in loop.
   while(ros::ok()) {
 
-//this block publishes the IMU data based on defined rate
+//this block publishes the IMU static unsigned long prev_control_time = 0;
+    static unsigned long prev_control_time = 0;
+    static unsigned long prev_imu_time = 0;
+    static unsigned long prev_debug_time = 0;
+    static bool imu_is_initialized;
+    
+    //data based on defined rate
     if ((millis() - prev_imu_time) >= (1000 / IMU_PUBLISH_RATE))
     {
         //sanity check if the IMU is connected
